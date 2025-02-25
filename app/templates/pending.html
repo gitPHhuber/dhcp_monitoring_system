@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Pending Servers</h1>
+
+  <!-- Форма поиска -->
+     <form method="GET" action="{{ url_for('main.pending') }}" class="mb-3">
+        <div class="input-group">
+            <input type="text" class="form-control" name="q" placeholder="Search by IP or Hostname" value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+            {% if search_query %}
+                <a href="{{ url_for('main.pending') }}" class="btn btn-secondary">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+    {% if current_user.role == 'admin' %}
+          <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>MAC Address</th>
+                    <th>Hostname</th>
+                    <th>Taken By</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                    <!--  Добавьте другие столбцы, если нужно -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for lease in leases %}
+                    <tr>
+                        <td><a href="http://{{ lease.ip }}" target="_blank">{{ lease.ip }}</a></td>
+                        <td>{{ lease.mac }}</td>
+                        <td>{{ lease.hostname }}</td>
+                        <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
+                        <td>{{ lease.status }}</td>
+                        <td>
+                           <button class="btn btn-sm btn-secondary reset-btn" data-lease-id="{{ lease.id }}">Reset</button>
+                        </td>
+                        <!--  Добавьте другие столбцы, если нужно -->
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+      <p>You do not have premmisions.</p>
+    {% endif %}
+    <script>
+    $(document).ready(function () {
+        //  Получаем CSRF-токен из мета-тега
+        var csrfToken = $('meta[name="csrf-token"]').attr('content');
+        function attachButtonHandlers() {
+            $(".reset-btn").off('click').on('click', function (event) { //  Добавили обработчик reset-btn
+                event.preventDefault();
+                let leaseId = $(this).data("lease-id");
+                $.ajax({
+                    url: `/api/leases/${leaseId}/reset`, //  URL для сброса
+                    type: "POST",  //  Используем POST
+                    data: {csrf_token: csrfToken},
+                    success: function (response) {
+                        console.log(response.message);
+                        location.reload(); //  Перезагружаем страницу целиком (проще, чем обновлять таблицу)
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Error resetting lease:", error);
+                        alert(xhr.responseJSON.message);
+                    }
+                });
+            });
+        }
+         attachButtonHandlers();
+    });
+    </script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Broken Servers</h1>
+    {% if current_user.role == 'admin' %}
+      <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>IP Address</th>
+                <th>MAC Address</th>
+                <th>Hostname</th>
+                <th>Taken By</th>
+                <th>Status</th>
+                <!--  Добавьте другие столбцы, если нужно -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for lease in leases %}
+                <tr>
+                    <td><a href="http://{{ lease.ip }}" target="_blank">{{ lease.ip }}</a></td>
+                    <td>{{ lease.mac }}</td>
+                    <td>{{ lease.hostname }}</td>
+                    <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
+                    <td>{{ lease.status }}</td>
+                    <!--  Добавьте другие столбцы, если нужно -->
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+     <p>You do not have premmisions.</p>
+    {% endif %}
+{% endblock %}

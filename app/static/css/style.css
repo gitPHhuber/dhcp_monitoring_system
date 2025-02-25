@@ -1,0 +1,131 @@
+/*  В static/css/style.css  */
+
+body {
+    font-family: sans-serif;
+    transition: background-color 0.3s, color 0.3s; /*  Плавный переход */
+}
+
+.status-cell {
+    font-weight: bold;
+}
+
+/*  Светлая тема (по умолчанию) */
+body {
+    background-color: #fff;  /*  Белый фон */
+    color: #333;            /*  Тёмно-серый текст */
+}
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-accent-bg: var(--bs-table-striped-bg); /*  Используем переменную Bootstrap */
+}
+
+/*  Тёмная тема */
+body.dark-mode {
+    background-color: #212529;  /*  Тёмно-серый фон */
+    color: #ced4da;            /*  Светло-серый текст */
+}
+
+body.dark-mode .navbar-light { /*  Стили для навбара */
+    background-color: #343a40 !important; /*  Более тёмный фон */
+}
+body.dark-mode .navbar-light .navbar-brand,
+body.dark-mode .navbar-light .nav-link {
+    color: #fff;  /*  Белый текст */
+}
+body.dark-mode .navbar-light .navbar-toggler-icon{
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+
+body.dark-mode .table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-accent-bg: #343a40;  /*  Более тёмный фон для нечётных строк */
+    color: #ced4da;             /* Светло серый цвет для текста, чтобы был читабельным*/
+}
+body.dark-mode .table > :not(:first-child) { /*Для границ*/
+    border-color: #495057;
+}
+
+body.dark-mode .btn-primary { /*Стили для кнопок*/
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+body.dark-mode .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+body.dark-mode .form-control { /*Стили для полей ввода*/
+  background-color: #495057;
+  border-color: #6c757d;
+  color: #fff;
+}
+body.dark-mode .form-control:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Стили для alert */
+body.dark-mode .alert-success {
+  background-color: #355c37; /* Более темный зеленый */
+  border-color:  #457b48;
+  color: #c3e6cb;
+}
+
+body.dark-mode .alert-danger {
+  background-color: #5c3535; /* Более темный красный */
+  border-color: #7b4545;
+  color: #f5c6cb;
+}
+body.dark-mode .alert-warning {
+  background-color: #665c35;
+  border-color: #8f7b45;
+  color: #fff3cd;
+}
+body.dark-mode .alert-info {
+    background-color: #355566;
+    border-color: #3d677e;
+    color: #cde5ff;
+}
+/*Стили для пагинации*/
+
+body.dark-mode .page-link {
+  color: #fff;
+  background-color: #343a40;
+  border-color: #454d55;
+}
+
+body.dark-mode .page-item.active .page-link {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+body.dark-mode .page-link:hover {
+  color: #fff;
+  background-color: #495057;
+  border-color: #495057;
+}
+body.dark-mode .page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: transparent;
+    border-color: #454d55;
+}
+/*Стиль для badge*/
+
+body.dark-mode .badge{
+  color: #000;
+}
+
+/*  Обработка длинных значений в таблице  */
+table.table td {
+    word-break: break-word;  /*  Разрешаем перенос слов */
+}
+
+/*  ИЛИ (более тонкая настройка):
+
+table.table td:nth-child(3) {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+*/

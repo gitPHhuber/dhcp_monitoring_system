@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: aioping
+Version: 0.4.0
+Summary: Asyncio ping implementation
+Home-page: https://github.com/stellarbit/aioping
+Download-URL: https://github.com/stellarbit/aioping/tarball/0.4.0
+Author: Anton Belousov
+Author-email: anton@belousov.co
+Keywords: network,icmp,ping,asyncio
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU General Public License v2 (GPLv2)
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+License-File: LICENSE.txt
+Requires-Dist: async-timeout
+Requires-Dist: aiodns
+

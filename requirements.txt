@@ -1,0 +1,15 @@
+Flask
+Flask-SQLAlchemy
+Flask-WTF
+Flask-Login
+Werkzeug
+python-dotenv
+gunicorn
+celery[redis]
+aioping
+Flask-Migrate
+redis
+celery-redbeat
+requests
+email_validator
+Flask-Mail

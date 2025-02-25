@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Settings</h1>
+    <form method="POST" action="">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.dhcp_server_ip.label(class="form-label") }}
+            {{ form.dhcp_server_ip(class="form-control") }}
+            {% for error in form.dhcp_server_ip.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.connection_type.label(class="form-label") }}
+            {{ form.connection_type(class="form-control") }}
+             {% for error in form.connection_type.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        {#  Скрываем поля SSH, если выбран тип подключения 'file' #}
+        <div id="ssh-fields" style="display: none;">
+            <div class="mb-3">
+                {{ form.ssh_username.label(class="form-label") }}
+                {{ form.ssh_username(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.ssh_password.label(class="form-label") }}
+                {{ form.ssh_password(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.ssh_key_path.label(class="form-label") }}
+                {{ form.ssh_key_path(class="form-control") }}
+            </div>
+        </div>
+
+        {{ form.submit(class="btn btn-primary") }}
+    </form>
+
+    <script>
+     $(document).ready(function() {
+        //  Функция, которая показывает/скрывает поля SSH
+        function toggleSshFields() {
+            if ($("#connection_type").val() === 'ssh') {
+                $("#ssh-fields").show();
+            } else {
+                $("#ssh-fields").hide();
+            }
+        }
+
+        //  Вызываем функцию при загрузке страницы и при изменении типа подключения
+        toggleSshFields();
+        $("#connection_type").change(toggleSshFields);
+    });
+
+    </script>
+{% endblock %}

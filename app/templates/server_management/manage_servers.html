@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Работа с серверным оборудованием</h1>
+
+    <div class="mb-3">
+        <button class="btn btn-primary run-playbook-btn" data-playbook="playbook1">Запустить Playbook 1</button>
+        <button class="btn btn-primary run-playbook-btn" data-playbook="playbook2">Запустить Playbook 2</button>
+         <!-- Добавьте другие кнопки по мере необходимости -->
+    </div>
+
+    <div id="result-message"></div> {#  Для отображения сообщений об успехе/ошибке #}
+
+    <script>
+    $(document).ready(function() {
+        $(".run-playbook-btn").click(function() {
+            let playbookName = $(this).data("playbook");
+             $("#result-message").text(`Running playbook: ${playbookName}...`).removeClass().addClass('alert alert-info'); //Показываем, что выполняется
+            $.ajax({
+                url: "{{ url_for('server_management.run_playbook') }}",
+                type: "POST",
+                data: { playbook: playbookName },
+                success: function(response) {
+                    $("#result-message").text(response.message).removeClass().addClass('alert alert-success');
+                },
+                error: function(xhr, status, error) {
+                    let errorMessage = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : "Error running playbook.";
+                    $("#result-message").text(errorMessage).removeClass().addClass('alert alert-danger');
+
+                }
+            });
+        });
+    });
+
+    </script>
+
+{% endblock %}
