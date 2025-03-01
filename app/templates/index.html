@@ -63,9 +63,10 @@
                             {% if lease.taken_by_id == current_user.id or current_user.role == 'admin' %}
                                 <button class="btn btn-sm btn-outline-secondary release-btn" data-lease-id="{{ lease.id }}">Release</button>
                             {% endif %}
-                        {% elif lease.status == 'ACTIVE' %}
+                        {% elif lease.status == 'active' %}
                             <button class="btn btn-sm btn-primary take-btn" data-lease-id="{{ lease.id }}">Take</button>
                         {% endif %}
+                        
 
                          {#  Дополнительные действия для админа (Complete, Pending, Broken, Reset, Delete)  #}
                         {% if current_user.role == 'admin' %}

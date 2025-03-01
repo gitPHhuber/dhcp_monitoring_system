@@ -8,6 +8,8 @@ import logging
 from logging.handlers import SMTPHandler, RotatingFileHandler
 import os
 from .journal import journal_bp  #  Импортируем blueprint
+from .journal import journal_bp as journal_blueprint
+
 
 from .extensions import db, login_manager, csrf, mail, celery
 from .config import config
@@ -32,6 +34,9 @@ def create_app(config_name='default'):
 
     from .api import api as api_blueprint
     app.register_blueprint(api_blueprint, url_prefix='/api')
+
+    # Отключаем CSRF для API-блюпринта, используя метод exempt экземпляра csrf
+    csrf.exempt(api_blueprint)
 
     from .auth import auth as auth_blueprint  # Blueprint для аутентификации
     app.register_blueprint(auth_blueprint, url_prefix='/auth')

@@ -1,10 +1,11 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from .models import Lease, LeaseStatus  # Добавили LeaseStatus
+from .models import Lease, LeaseStatus, LeaseStatusHistory
 from .extensions import db
 from .utils import parse_dhcp_leases
 from . import tasks
 from .journal import record_action # Добавил
+from .models import Lease, LeaseStatus, LeaseStatusHistory
 
 api = Blueprint('api', __name__)
 
