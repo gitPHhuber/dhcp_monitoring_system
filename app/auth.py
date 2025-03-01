@@ -4,8 +4,8 @@ from .forms import LoginForm, RegistrationForm
 from .models import User
 from .extensions import db
 from urllib.parse import urlparse
-from datetime import datetime  # Импортируем datetime
-
+from .journal import record_action
+from datetime import datetime  # <-- ДОБАВИТЬ ИМПОРТ!
 
 auth = Blueprint('auth', __name__)
 
@@ -21,10 +21,9 @@ def login():
             next_page = request.args.get('next')
             if not next_page or urlparse(next_page).netloc != '':
                 next_page = url_for('main.index')
-
-            user.last_seen = datetime.utcnow() # В auth.login добавил
-            db.session.commit()# В auth.login добавил
-
+            user.last_seen = datetime.utcnow()  #  Используем datetime
+            db.session.commit()
+            record_action(user.id, 'login')  #  Журналируем вход
             return redirect(next_page)
 
         flash('Invalid username or password.', 'danger')
@@ -33,7 +32,9 @@ def login():
 @auth.route('/logout')
 @login_required
 def logout():
+    user_id = current_user.id  # Сохраняем ID до выхода
     logout_user()
+    record_action(user_id, 'logout')   # Используем сохранённый user_id
     flash('You have been logged out.', 'success')
     return redirect(url_for('auth.login'))
 
@@ -46,14 +47,14 @@ def register():
 
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.username.data, role=form.role.data, first_name = form.first_name.data, last_name = form.last_name.data) #Изменено
+        user = User(username=form.username.data, role=form.role.data, first_name=form.first_name.data, last_name=form.last_name.data)
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
+        record_action(current_user.id, 'register', f'New user: {user.username}')
         flash('New user registered successfully.', 'success')
-        return redirect(url_for('auth.login'))  # Или куда-то еще
+        return redirect(url_for('auth.login'))
     return render_template('register.html', form=form)
-
 
 @auth.route('/reset_password_request', methods=['GET', 'POST'])
 def reset_password_request():

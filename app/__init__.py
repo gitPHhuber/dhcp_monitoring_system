@@ -7,6 +7,7 @@ from celery import Celery
 import logging
 from logging.handlers import SMTPHandler, RotatingFileHandler
 import os
+from .journal import journal_bp  #  Импортируем blueprint
 
 from .extensions import db, login_manager, csrf, mail, celery
 from .config import config
@@ -43,6 +44,9 @@ def create_app(config_name='default'):
 
     from .users import users as users_blueprint  # Добавили
     app.register_blueprint(users_blueprint)      # Добавили
+
+    from .journal import journal_bp as journal_blueprint  #  Добавили
+    app.register_blueprint(journal_blueprint)            #  Добавили
 
     #Настройка журналирования
     if not app.debug and not app.testing:

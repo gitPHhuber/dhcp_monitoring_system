@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from .models import Lease
+from .models import Lease, LeaseStatus  # Добавили LeaseStatus
 from .extensions import db
 from .utils import parse_dhcp_leases
 from . import tasks
+from .journal import record_action # Добавил
 
 api = Blueprint('api', __name__)
 
@@ -23,103 +24,115 @@ def get_lease(lease_id):
 @login_required
 def take_lease(lease_id):
     lease = Lease.query.get_or_404(lease_id)
-    if lease.status != 'active':
-        return jsonify({'message': 'Lease is not available.'}), 409
+    if lease.in_work and lease.taken_by_id != current_user.id:
+        return jsonify({'message': 'Lease is already taken by another user.'}), 409
 
+    old_status = lease.status  # Сохраняем старый статус
     lease.in_work = True
     lease.taken_by_id = current_user.id
-    lease.status = 'in_work'
+    lease.status = LeaseStatus.IN_WORK
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) #Добавили
     db.session.commit()
+    record_action(current_user.id, 'take_lease', f'Lease ID: {lease_id}') # Добавил
     return jsonify({'message': 'Lease taken successfully.', 'lease': lease.as_dict()}), 200
 
-#  НОВЫЕ ОБРАБОТЧИКИ для Complete, Pending, Broken
+@api.route('/leases/<int:lease_id>/release', methods=['POST'])
+@login_required
+def release_lease(lease_id):
+    lease = Lease.query.get_or_404(lease_id)
+    if not lease.in_work:
+        return jsonify({'message': 'Lease is not taken.'}), 400
+    if lease.taken_by_id != current_user.id and current_user.role != 'admin':
+        return jsonify({'message': 'You do not have permission to release this lease.'}), 403
+    old_status = lease.status  # Добавили
+    lease.in_work = False
+    lease.taken_by_id = None
+    lease.status = LeaseStatus.ACTIVE
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.commit()
+    record_action(current_user.id, 'release_lease', f'Lease ID: {lease_id}') # Добавил
+    return jsonify({'message': 'Lease released successfully.', 'lease': lease.as_dict()}), 200
+
 
 @api.route('/leases/<int:lease_id>/complete', methods=['POST'])
 @login_required
 def complete_lease(lease_id):
     lease = Lease.query.get_or_404(lease_id)
-    #  Проверяем, что сервер взят в работу ТЕКУЩИМ пользователем, ИЛИ это админ
-    if lease.status == 'in_work' and (lease.taken_by_id == current_user.id or current_user.role == 'admin'):
-        lease.status = 'completed'
-        lease.in_work = False #Добавил
-        db.session.commit()
-        return jsonify({'message': 'Lease completed successfully.'}), 200
-    else:
-        return jsonify({'message': 'Unauthorized or lease not in work.'}), 403  #  Или 400 Bad Request
+    old_status = lease.status # Добавили
+    lease.status = LeaseStatus.COMPLETED
+    lease.in_work = False
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.commit()
+    record_action(current_user.id, 'complete_lease', f'Lease ID: {lease_id}')  # Добавил
+    return jsonify({'message': 'Lease completed successfully.', 'lease': lease.as_dict()}), 200
+
 
 @api.route('/leases/<int:lease_id>/pending', methods=['POST'])
 @login_required
 def pending_lease(lease_id):
-    lease = Lease.query.get_or_404(lease_id)
-    if current_user.role != 'admin':  #  Только админ может менять статус
+    if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
-    if lease.status == 'pending':
-        return jsonify({'message': 'Lease is already pending.'}), 400 #
-    lease.status = 'pending'
+    lease = Lease.query.get_or_404(lease_id)
+    old_status = lease.status  # Добавили
+    lease.status = LeaseStatus.PENDING
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
     db.session.commit()
-    return jsonify({'message': 'Lease status set to pending.'}), 200
+    record_action(current_user.id, 'pending_lease', f'Lease ID: {lease_id}') # Добавил
+    return jsonify({'message': 'Lease set to pending successfully.', 'lease': lease.as_dict()}), 200
+
 
 @api.route('/leases/<int:lease_id>/broken', methods=['POST'])
 @login_required
 def broken_lease(lease_id):
-    lease = Lease.query.get_or_404(lease_id)
-    if current_user.role != 'admin':  #  Только админ может менять статус
+    if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
-     # Добавьте проверку, если нужно, что сервер не в статусе broken
-    lease.status = 'broken'
+    lease = Lease.query.get_or_404(lease_id)
+    old_status = lease.status  # Добавили
+    lease.status = LeaseStatus.BROKEN
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
     db.session.commit()
-    return jsonify({'message': 'Lease status set to broken.'}), 200
+    record_action(current_user.id, 'broken_lease', f'Lease ID: {lease_id}') # Добавил
+    return jsonify({'message': 'Lease set to broken successfully.', 'lease': lease.as_dict()}), 200
 
-#  НОВЫЙ ENDPOINT для сброса статуса
 @api.route('/leases/<int:lease_id>/reset', methods=['POST'])
 @login_required
 def reset_lease(lease_id):
-    lease = Lease.query.get_or_404(lease_id)
     if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
-
-    lease.status = 'active'
-    lease.in_work = False  # Сбрасываем флаг "в работе"
-    lease.taken_by_id = None  # Очищаем поле taken_by_id
+    lease = Lease.query.get_or_404(lease_id)
+    old_status = lease.status  #  Добавили
+    lease.status = LeaseStatus.ACTIVE
+    lease.in_work = False
+    lease.taken_by_id = None
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
     db.session.commit()
-    return jsonify({'message': 'Lease status reset to active.'}), 200
+    record_action(current_user.id, 'reset_lease', f'Lease ID: {lease_id}')# Добавил
+    return jsonify({'message': 'Lease status reset successfully.', 'lease': lease.as_dict()}), 200
 
-
-@api.route('/leases/<int:lease_id>', methods=['PUT']) #  PUT для обновления
+@api.route('/leases/<int:lease_id>', methods=['PUT'])
 @login_required
 def update_lease(lease_id):
     lease = Lease.query.get_or_404(lease_id)
-
     if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
-
     data = request.get_json()
     if not data:
         return jsonify({'message': 'No input data provided'}), 400
-
     if 'binding_state' in data and data['binding_state'] not in ['active', 'free', 'expired']:
         return jsonify({'message': 'Invalid binding_state value'}), 400
-
-    if 'status' in data and data['status'] not in ['active', 'in_work', 'completed', 'broken', 'pending']:
-        return jsonify({'message': 'Invalid status value'}), 400
-
     for key, value in data.items():
         if hasattr(lease, key):
             setattr(lease, key, value)
-
     db.session.commit()
+    record_action(current_user.id, 'update_lease', f'Lease ID: {lease_id}')  # Добавил
     return jsonify({'message': 'Lease updated successfully', 'lease': lease.as_dict()}), 200
+
 
 @api.route('/leases/<int:lease_id>', methods=['DELETE'])
 @login_required
 def delete_lease(lease_id):
-    lease = Lease.query.get_or_404(lease_id)
-    if current_user.role != 'admin':
-         return jsonify({'message': 'Unauthorized'}), 403
-    db.session.delete(lease)
-    db.session.commit()
-    return jsonify({'message': 'Lease deleted successfully'}), 200
-
+  #Реализовать если требуется удаление записей (и поддерживается DHCP сервером)
+    pass
 
 @api.errorhandler(404)
 def not_found(error):

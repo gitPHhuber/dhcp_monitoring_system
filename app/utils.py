@@ -1,50 +1,48 @@
+import re
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Tuple
-from .models import Lease, db
+from .models import Lease, db, LeaseStatus  # LeaseStatus нужен!
 from .extensions import celery
 from .config import Config
 import aioping
-# from asyncio import TimeoutError  #  Уже не нужно, т.к. есть общий TimeoutError
+from asyncio import TimeoutError  # Явный импорт TimeoutError
+import paramiko
+import io
+import logging
 
+#  Настройка логгера для utils.py
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  #  Или DEBUG для отладки
 
 async def ping_host(ip: str, timeout: float = Config.PING_TIMEOUT) -> bool:
     """Асинхронная проверка доступности хоста."""
     try:
         delay = await aioping.ping(ip, timeout=timeout)
         return True  # Пинг успешен
-    except asyncio.TimeoutError:  #  Используем asyncio.TimeoutError
-        return False  # Пинг не прошел (таймаут)
-    except OSError:  #  Перехватываем OSError (например, "Network is unreachable")
-        return False
-    #  aioping.errors.PingError больше не нужен
+    except (TimeoutError, OSError):  #  <--  Исправлено: убрали aioping.errors.PingError
+        return False  # Пинг не прошел
 
 
 def parse_dhcp_leases(leases_file: str, dhcp_server_ip:str) -> List[Dict]:
     """
-    Парсинг файла dhcpd.leases (для ISC DHCP).
-
-    Args:
-        leases_file: Путь к файлу dhcpd.leases.
-
-    Returns:
-        Список словарей с информацией о лизах.
+    Парсинг файла dhcpd.leases (для ISC DHCP).  Обрабатывает и путь к файлу (str), и StringIO.
     """
     leases = []
-     # leases_file может быть путем к файлу (str) или объектом StringIO
-    if isinstance(leases_file, str):
-        try:
-            file_obj = open(leases_file, 'r')
-        except FileNotFoundError:
-            print(f"Error: Leases file not found: {leases_file}")
-            return []
-        except Exception as e:
-            print(f"Error opening leases file: {e}")
-            return []
-    else:  # StringIO
-         file_obj = leases_file
-
+    file_obj = None  #  Добавлено для корректного finally
     try:
+        if isinstance(leases_file, str):
+            try:
+                file_obj = open(leases_file, 'r')
+            except FileNotFoundError:
+                logger.error(f"Leases file not found: {leases_file}")  #  Логирование!
+                return []
+            except OSError as e:  #  Более конкретная ошибка
+                logger.error(f"Error opening leases file {leases_file}: {e}")
+                return []
+        else:
+            file_obj = leases_file
+
         with file_obj as f:
             current_lease = {}
             for line in f:
@@ -56,7 +54,6 @@ def parse_dhcp_leases(leases_file: str, dhcp_server_ip:str) -> List[Dict]:
                 elif line.startswith('hardware ethernet'):
                     current_lease['mac'] = line.split()[2].rstrip(';')
                 elif line.startswith('starts'):
-                    #  "starts 1 2024/03/16 08:35:13;"
                     parts = line.split()
                     date_str = f"{parts[2]} {parts[3].rstrip(';')}"
                     current_lease['starts'] = datetime.strptime(date_str, "%Y/%m/%d %H:%M:%S")
@@ -65,20 +62,24 @@ def parse_dhcp_leases(leases_file: str, dhcp_server_ip:str) -> List[Dict]:
                     date_str = f"{parts[2]} {parts[3].rstrip(';')}"
                     current_lease['ends'] = datetime.strptime(date_str, "%Y/%m/%d %H:%M:%S")
                 elif line.startswith('binding state'):
-                    current_lease['binding_state'] = line.split()[2].rstrip(';')
+                    #  <--  ПРЕОБРАЗУЕМ В ВЕРХНИЙ РЕГИСТР -->
+                    current_lease['binding_state'] = line.split()[2].rstrip(';').upper()
                 elif line.startswith('client-hostname'):
                     current_lease['hostname'] = line.split()[1].strip('"').rstrip(';')
                 elif line.startswith('uid'):
                     current_lease['uid'] = line.split()[1].strip('"').rstrip(';')
-            if current_lease:  #  Последний лиз
+            if current_lease:
                 leases.append(current_lease)
+
     except Exception as e:
-        print(f"Error parsing leases file: {e}")
+        logger.exception(f"Error parsing leases file: {e}")  #  Более подробный лог
         return []
     finally:
-        if isinstance(leases_file, str):  # Закрываем файл, только если это был путь
-             file_obj.close()
+        if isinstance(leases_file, str) and file_obj is not None: #  Добавили проверку file_obj
+            file_obj.close()
+
     return leases
+
 
 def parse_dhcp_conf_for_ip(conf_file: str) -> str | None:
     """Парсит файл dhcpd.conf и возвращает IP-адрес сервера (если найден)."""
@@ -88,12 +89,13 @@ def parse_dhcp_conf_for_ip(conf_file: str) -> str | None:
                 if line.strip().startswith('server-identifier'):
                     return line.split()[1].rstrip(';')
     except FileNotFoundError:
-        print(f"Error: Config file not found: {conf_file}")
+        logger.error(f"Config file not found: {conf_file}")  #  Логирование
         return None
     except Exception as e:
-         print(f"Error parsing config file: {e}")
-         return None
+        logger.exception(f"Error parsing config file: {e}")  #  Более подробный лог
+        return None
     return None
+
 
 def get_leases_via_ssh(server_ip, username, password=None, key_path=None):
     """Подключается к серверу по SSH и читает файл dhcpd.leases."""
@@ -103,26 +105,25 @@ def get_leases_via_ssh(server_ip, username, password=None, key_path=None):
 
         if key_path:
             key = paramiko.RSAKey.from_private_key_file(key_path)
-            ssh.connect(server_ip, username=username, pkey=key)  #  Используем pkey
+            ssh.connect(server_ip, username=username, pkey=key)
         elif password:
             ssh.connect(server_ip, username=username, password=password)
         else:
             raise ValueError("Either password or key_path must be provided")
 
-        # Выполняем команду для чтения файла
-        stdin, stdout, stderr = ssh.exec_command('cat /var/lib/dhcp/dhcpd.leases')  # Путь к файлу!
+        stdin, stdout, stderr = ssh.exec_command('cat /var/lib/dhcp/dhcpd.leases')  #  <--  ПУТЬ!
         leases_content = stdout.read().decode('utf-8')
         ssh.close()
-
-        # Используем StringIO, чтобы parse_dhcp_leases мог работать со строкой, как с файлом
         return parse_dhcp_leases(io.StringIO(leases_content), server_ip)
 
-    except paramiko.AuthenticationException:
-        print(f"Authentication failed to {server_ip}")
-        return []  #  Или другое действие по умолчанию
+    except paramiko.AuthenticationException as e:
+        logger.error(f"Authentication failed to {server_ip}: {e}")  #  Логирование!
+        flash(f"Authentication failed to {server_ip}", "error")  #  Сообщение пользователю
+        return []
     except paramiko.SSHException as e:
-        print(f"SSH error: {e}")
+        logger.error(f"SSH error connecting to {server_ip}: {e}") #  Логирование!
+        flash(f"SSH error: {e}", "error") # Сообщение
         return []
     except Exception as e:
-        print(f"Error connecting via SSH: {e}")
+        logger.exception(f"Error connecting to {server_ip} via SSH: {e}")  #  Более подробный лог
         return []

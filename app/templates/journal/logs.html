@@ -1,0 +1,26 @@
+{# app/templates/journal/logs.html #}
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Journal</h1>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in logs %}
+                <tr>
+                    <td>{{ entry.timestamp }}</td>
+                    <td>{{ entry.user.username }}</td>
+                    <td>{{ entry.action }}</td>
+                    <td>{{ entry.details }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
