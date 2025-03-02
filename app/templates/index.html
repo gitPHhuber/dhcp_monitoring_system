@@ -15,7 +15,6 @@
         </div>
     </form>
 
-
     <table class="table table-striped" id="leases-table">
         <thead>
             <tr>
@@ -25,7 +24,6 @@
                 <th>Starts</th>
                 <th>Ends</th>
                 <th>State</th>
-                <th>UID</th>
                 <th>Online</th>
                 <th>Last Check</th>
                 <th>In Work</th>
@@ -37,16 +35,16 @@
             </tr>
         </thead>
         <tbody>
-            {% for lease in leases.items %}  <!--  Используем leases.items для пагинации -->
-                <tr>
+            {% for lease in leases.items %}
+                {#  Добавляем класс для раскраски строки, если лиз "in_work"  #}
+                <tr {% if lease.status.value == 'in_work' %}class="table-warning"{% endif %}>
                     <td>{{ lease.ip }}</td>
                     <td>{{ lease.mac }}</td>
                     <td>{{ lease.hostname|d('N/A') }}</td>
                     <td>{{ lease.starts|d('N/A') }}</td>
                     <td>{{ lease.ends|d('N/A') }}</td>
                     <td>{{ lease.binding_state }}</td>
-                    <td>{{ lease.uid|d('N/A') }}</td>
-                    <td class="status-cell" data-ip="{{ lease.ip }}">{{ "Online" if lease.is_online else "Offline" }}</td>
+                    <td>{{ "Online" if lease.is_online else "Offline" }}</td>
                     <td>{{ lease.last_check|d('N/A') }}</td>
                     <td>
                         {% if lease.in_work %}
@@ -56,237 +54,151 @@
                         {% endif %}
                     </td>
                     <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
-                    <td>{{ lease.status }}</td>
+                    <td>{{ lease.status.value }}</td>  {# ИСПРАВЛЕНО: .value #}
                     <td>
-                         {#  Кнопки действий, отображаются в зависимости от статуса и роли  #}
-                        {% if lease.status == 'IN_WORK' %}
-                            {% if lease.taken_by_id == current_user.id or current_user.role == 'admin' %}
-                                <button class="btn btn-sm btn-outline-secondary release-btn" data-lease-id="{{ lease.id }}">Release</button>
+                        {#  Кнопки действий  #}
+                   
+                        {#  ТЕСТИРОВЩИК  #}
+                        {% if current_user.role == 'tester' %}
+                            {% if lease.status.value == 'active' %}
+                                <button class="btn btn-sm btn-primary take-btn" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</button>
                             {% endif %}
-                        {% elif lease.status == 'active' %}
-                            <button class="btn btn-sm btn-primary take-btn" data-lease-id="{{ lease.id }}">Take</button>
+                            {% if lease.status.value == 'in_work' and lease.taken_by_id == current_user.id %}
+                                <button class="btn btn-sm btn-outline-secondary release-btn" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</button>
+                                <button class="btn btn-sm btn-outline-success complete-btn" data-url="{{ url_for('api.complete_lease', lease_id=lease.id) }}">Complete</button>
+                            {% endif %}
                         {% endif %}
-                        
-
-                         {#  Дополнительные действия для админа (Complete, Pending, Broken, Reset, Delete)  #}
+                   
+                   
+                        {#  АДМИНИСТРАТОР  #}
                         {% if current_user.role == 'admin' %}
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton{{ lease.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     Admin
                                 </button>
-                                <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton{{ lease.id }}">
-                                    <li><a class="dropdown-item complete-btn" href="#" data-lease-id="{{ lease.id }}">Complete</a></li>
-                                    <li><a class="dropdown-item pending-btn" href="#" data-lease-id="{{ lease.id }}">Pending</a></li>
-                                    <li><a class="dropdown-item broken-btn" href="#" data-lease-id="{{ lease.id }}">Broken</a></li>
-                                    <li><a class="dropdown-item reset-btn" href="#" data-lease-id="{{ lease.id }}">Reset Status</a></li>
-                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item delete-btn" href="#" data-lease-id="{{ lease.id}}">Delete</a></li>
-                                </ul>
-                            </div>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                                <ul class="dropdown-menu">
+                                    {% if lease.status.value == 'active' %}
+                                       <li><a class="dropdown-item take-btn" href="#" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</a></li>  {# data-url #}
+                                    {% endif %}
+                                    {% if lease.status.value == 'in_work' %}
+                                       <li><a class="dropdown-item release-btn" href="#" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</a></li> {# data-url #}
+                                    {% endif %}
+                                    <li><a class="dropdown-item complete-btn" href="#" data-url="{{ url_for('api.complete_lease', lease_id=lease.id) }}">Complete</a></li>  {# data-url #}
+                                    {% if lease.status.value != 'pending' %}
+                                        <li><a class="dropdown-item pending-btn" href="#" data-url="{{ url_for('api.pending_lease', lease_id=lease.id) }}">Pending</a></li> {# data-url #}
+                                    {% endif %}
+                                    {% if lease.status.value != 'broken' %}
+                                        <li><a class="dropdown-item broken-btn" href="#" data-url="{{ url_for('api.broken_lease', lease_id=lease.id) }}">Broken</a></li>  {# data-url #}
+                                    {% endif %}
+                                    <li><a class="dropdown-item reset-btn" href="#" data-url="{{ url_for('api.reset_lease', lease_id=lease.id) }}">Reset Status</a></li>  {# data-url #}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item delete-btn" href="#" data-url="{{ url_for('api.delete_lease', lease_id=lease.id)}}">Delete</a></li>  {# data-url #}
+                                               </ul>
+                                           </div>
+                                       {% endif %}
+                                   </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
-     {#  Пагинация  #}
-    <nav>
-        <ul class="pagination">
-            {% if leases.has_prev %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.prev_num, q=search_query) }}">Previous</a></li>
-            {% else %}
-                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-            {% endif %}
+ {#  Пагинация  #}
+<nav>
+    <ul class="pagination">
+        {% if leases.has_prev %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.prev_num, q=search_query) }}">Previous</a></li>
+        {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+        {% endif %}
 
-            {% for page_num in leases.iter_pages() %}
-                {% if page_num %}
-                    {% if page_num == leases.page %}
-                        <li class="page-item active"><a class="page-link" href="#">{{ page_num }}</a></li>
-                    {% else %}
-                        <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=page_num, q=search_query) }}">{{ page_num }}</a></li>
-                    {% endif %}
+        {% for page_num in leases.iter_pages() %}
+            {% if page_num %}
+                {% if page_num == leases.page %}
+                    <li class="page-item active"><a class="page-link" href="#">{{ page_num }}</a></li>
                 {% else %}
-                    <li class="page-item disabled"><a class="page-link" href="#">...</a></li>
+                    <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=page_num, q=search_query) }}">{{ page_num }}</a></li>
                 {% endif %}
-            {% endfor %}
-
-            {% if leases.has_next %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.next_num, q=search_query) }}">Next</a></li>
             {% else %}
-                <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+                <li class="page-item disabled"><a class="page-link" href="#">...</a></li>
             {% endif %}
-        </ul>
-    </nav>
+        {% endfor %}
 
-    <script>
-     $(document).ready(function() {
-        // Функция обновления таблицы
-        function updateTable() {
-            $.ajax({
-                url: "{{ url_for('main.update_table') }}",
-                type: "GET",
-                data: {
-                    status: "{{ request.path.split('/')[-1] }}",  //  <--  Передаём статус!
-                    q: "{{ search_query }}" //Передаем значение поиска
-                },
-                dataType: "json",
-                success: function(data) {
-                    let tbody = $("#leases-table tbody");
-                    tbody.empty();  // Очищаем таблицу
+        {% if leases.has_next %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.next_num, q=search_query) }}">Next</a></li>
+        {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+        {% endif %}
+    </ul>
+</nav>
+<script>
+$(document).ready(function() {
+    // Функция обновления таблицы (AJAX)
+    function updateTable() {
+        $.ajax({
+            url: "{{ url_for('main.update_table') }}",  //  Правильный URL
+            type: "GET",
+            data: {
+                status: $("#leases-table").data("status"),  //  <--  Получаем статус из data-status
+                q: "{{ search_query }}"
+            },
+            // dataType: "json",  <--  УДАЛЕНО!
+            success: function(data) {
+                $("#leases-table").html(data); //  <--  Заменяем содержимое таблицы
+            },
+            error: function(xhr, status, error) {
+                console.error("Error updating table:", error);
+                alert("Error updating table: " + error);
+            }
+        });
+    }
 
-                    // Заполняем таблицу новыми данными
-                    data.forEach(function(lease) {
-                        let row = `
-                            <tr>
-                                <td>${lease.ip}</td>
-                                <td>${lease.mac}</td>
-                                <td>${lease.hostname !== null ? lease.hostname : 'N/A'}</td>
-                                <td>${lease.starts || 'N/A'}</td>
-                                <td>${lease.ends || 'N/A'}</td>
-                                <td>${lease.binding_state}</td>
-                                <td>${lease.uid !== null ? lease.uid : 'N/A'}</td>
-                                <td class="status-cell" data-ip="${lease.ip}">${lease.is_online ? "Online" : "Offline"}</td>
-                                <td>${lease.last_check !== null ? lease.last_check : 'N/A'}</td>
-                                <td>
-                                    ${lease.in_work ? `
-                                        <span class="badge bg-warning">In Work</span>
-                                    ` : `<span class="badge bg-secondary">Not In Work</span>`}
-                                </td>
-                                <td>${lease.taken_by || ''}</td>
-                                <td>${lease.status}</td>
-                                <td>
-                                    ${lease.status === 'IN_WORK' ? `
-                                        ${(lease.taken_by === "{{ current_user.username }}" || "{{ current_user.role }}" === 'admin') ? `<button class="btn btn-sm btn-outline-secondary release-btn" data-lease-id="${lease.id}">Release</button>` : ''}
-                                    ` : ''}
-                                    ${lease.status === 'ACTIVE' ? `
-                                        <button class="btn btn-sm btn-primary take-btn" data-lease-id="${lease.id}">Take</button>
-                                    ` : ''}
-                                     ${"{{ current_user.role }}" === 'admin' ? `
-                                     <div class="dropdown">
-                                       <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton${lease.id}" data-bs-toggle="dropdown" aria-expanded="false">
-                                         Admin
-                                       </button>
-                                       <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton${lease.id}">
-                                         <li><a class="dropdown-item complete-btn" href="#" data-lease-id="${lease.id}">Complete</a></li>
-                                         <li><a class="dropdown-item pending-btn" href="#" data-lease-id="${lease.id}">Pending</a></li>
-                                         <li><a class="dropdown-item broken-btn" href="#" data-lease-id="${lease.id}">Broken</a></li>
-                                         <li><a class="dropdown-item reset-btn" href="#" data-lease-id="${lease.id}">Reset Status</a></li>
-                                         <li><hr class="dropdown-divider"></li>
-                                         <li><a class="dropdown-item delete-btn" href="#" data-lease-id="${lease.id}}">Delete</a></li>
-                                       </ul>
-                                     </div>
-                                    ` : ''}
-                                </td>
+    // Делегирование событий (ПРАВИЛЬНОЕ)
+    $("#leases-table").on("click", ".take-btn, .release-btn, .complete-btn, .pending-btn, .broken-btn, .reset-btn, .delete-btn", function(event) {
+        event.preventDefault();
+        let url = $(this).data("url"); //  Получаем URL из data-url
 
-                            </tr>
-                        `;
-                        tbody.append(row);
-                    });
-                     //  Перенавешиваем обработчики после обновления (иначе не будут работать)
-                     attachButtonHandlers();
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error updating table:", error);
-                }
-            });
+        if (!url) {
+            console.error("No URL found for action button");
+            return;
         }
 
-        // Обработчики кнопок (Take, Release)
-        function attachButtonHandlers(){
-            $(".take-btn").click(function() {
-                let leaseId = $(this).data("lease-id");
-                $.ajax({
-                    url: `/api/leases/${leaseId}/take`,
-                    type: "POST",
-                    success: function(response) {
-                        console.log(response.message);
-                        updateTable(); // Обновляем таблицу после успешного взятия
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("Error taking lease:", error);
-                         alert(xhr.responseJSON.message); //Показываем сообщение об ошибке
-                    }
-                });
-            });
+        let method = $(this).hasClass("delete-btn") ? "DELETE" : "POST";
 
-            $(".release-btn").click(function() {
-                let leaseId = $(this).data("lease-id");
-                $.ajax({
-                    url: `/api/leases/${leaseId}/release`,
-                    type: "POST",
-                    success: function(response) {
-                        console.log(response.message);
-                        updateTable();  // Обновляем
-                    },
-                     error: function(xhr, status, error) {
-                        console.error("Error releasing lease:", error);
-                        alert(xhr.responseJSON.message);
-                    }
-                });
-            });
-             $(".complete-btn").click(function() { //Добавил
-                let leaseId = $(this).data("lease-id");
-                $.ajax({
-                    url: `/api/leases/${leaseId}/complete`,
-                    type: 'POST',
-                    success: function(response) {
-                        console.log(response.message);
-                        updateTable(); // Обновляем таблицу
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("Error completing lease:", error);
-                        alert(xhr.responseJSON.message);
-                    }
-                });
-            });
-            $(".pending-btn").click(function() { //Добавил
-                let leaseId = $(this).data("lease-id");
-                  $.ajax({
-                      url: `/api/leases/${leaseId}/pending`, // <-- URL
-                      type: "POST",
-                      success: function() {
-                          updateTable(); // Обновляем таблицу
-                      },
-                      error: function(xhr) {
-                          alert(xhr.responseJSON.message);
-                      }
-                  });
-              });
-            $(".broken-btn").click(function() { //Добавил
-                let leaseId = $(this).data("lease-id");
-                  $.ajax({
-                      url: `/api/leases/${leaseId}/broken`, // <-- URL
-                      type: "POST",
-                      success: function() {
-                          updateTable(); // Обновляем таблицу
-                      },
-                      error: function(xhr) {
-                          alert(xhr.responseJSON.message);
-                      }
-                  });
-              });
-             $(".reset-btn").click(function() { //Добавил
-                let leaseId = $(this).data("lease-id");
-                  $.ajax({
-                      url: `/api/leases/${leaseId}/reset`, // <-- URL
-                      type: "POST",
-                      success: function() {
-                          updateTable(); // Обновляем таблицу
-                      },
-                      error: function(xhr) {
-                          alert(xhr.responseJSON.message);
-                      }
-                  });
-              });
-        }
-
-
-        //  Инициализация обработчиков при загрузке
-        attachButtonHandlers();
-
-        //  Периодическое обновление таблицы (каждые 30 секунд, например)
-        setInterval(updateTable, 30000);
+        $.ajax({
+            url: url,
+            type: method,
+            success: function(response) {
+                console.log(response.message);
+                updateTable(); // Обновляем таблицу
+            },
+            error: function(xhr, status, error) {
+                console.error("Error performing action:", error);
+                alert(xhr.responseJSON ? xhr.responseJSON.message : "An error occurred.");
+            }
+        });
     });
-    </script>
+
+    //  Периодическое обновление таблицы (можно пока закомментировать для отладки)
+    // setInterval(updateTable, 30000);
+
+    // Первоначальное обновление таблицы
+    updateTable();
+});
+
+//  Переключение темной темы (можно оставить в base.html, или тоже перенести в app.js)
+$("#dark-mode-toggle").click(function() {
+    let currentTheme = $("body").hasClass("dark-mode") ? "dark" : "light";
+      $.ajax({
+          url: "{{ url_for('main.toggle_dark_mode') }}?theme=" + currentTheme,
+          type: "GET",
+            success: function(data) {
+                if (data.theme === 'dark') {
+                    $("body").addClass("dark-mode");
+                } else {
+                    $("body").removeClass("dark-mode");
+                }
+            }
+    });
+});
+</script>
 {% endblock %}

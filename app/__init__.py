@@ -53,6 +53,9 @@ def create_app(config_name='default'):
     from .journal import journal_bp as journal_blueprint  #  Добавили
     app.register_blueprint(journal_blueprint)            #  Добавили
 
+    from .network import network as network_blueprint
+    app.register_blueprint(network_blueprint, url_prefix='/network')
+
     #Настройка журналирования
     if not app.debug and not app.testing:
         if app.config['MAIL_SERVER']:

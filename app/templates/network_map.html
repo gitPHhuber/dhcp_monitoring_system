@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Network Map</h1>
+  <!-- Контейнер для отрисовки графа -->
+  <div id="cy" style="width: 100%; height: 600px; border: 1px solid #ccc;"></div>
+  
+  <!-- Вывод отладочной информации (опционально) -->
+  <pre id="debug" style="display: none;"></pre>
+
+  <!-- Подключаем Cytoscape.js через CDN -->
+  <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+  <script>
+    function loadNetworkMap() {
+      fetch("{{ url_for('network.network_map_data') }}")
+        .then(response => response.json())
+        .then(data => {
+          // Если хотите видеть данные, можно раскомментировать:
+          // document.getElementById('debug').textContent = JSON.stringify(data, null, 2);
+          
+          var cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: data.nodes.concat(data.edges),
+            style: [
+              {
+                selector: 'node',
+                style: {
+                  'background-color': '#007bff',
+                  'label': 'data(label)',
+                  'text-valign': 'center',
+                  'color': '#fff',
+                  'font-size': '12px'
+                }
+              },
+              {
+                selector: 'edge',
+                style: {
+                  'width': 2,
+                  'line-color': '#ccc',
+                  'target-arrow-color': '#ccc',
+                  'target-arrow-shape': 'triangle',
+                  'curve-style': 'bezier',
+                  'label': 'data(label)',
+                  'font-size': '10px'
+                }
+              }
+            ],
+            layout: {
+              name: 'cose',  // более динамичный layout для сетевых графов
+              padding: 10
+            }
+          });
+        })
+        .catch(error => {
+          console.error("Error loading network map:", error);
+        });
+    }
+    document.addEventListener('DOMContentLoaded', loadNetworkMap);
+  </script>
+{% endblock %}
