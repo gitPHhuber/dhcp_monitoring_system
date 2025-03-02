@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:5000"  #  Изменено: <порт на хосте>:<порт контейнера Flask>
+    volumes:
+      - .:/app  #  Монтируем текущую директорию (для разработки)
+    environment:
+      - FLASK_ENV=development  #  Для разработки
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///instance/app.db  #  SQLite для разработки
+      - DHCP_SERVER_IP=192.168.1.1  #  *** ЗАМЕНИТЕ НА IP ВАШЕГО DHCP-СЕРВЕРА ***
+      - DHCP_LEASES_FILE=/var/lib/dhcp/dhcpd.leases # *** ЗАМЕНИТЕ НА ПУТЬ К ВАШЕМУ dhcpd.leases ***
+      - DHCP_CONF_FILE=/etc/dhcp/dhcpd.conf       # <-- Добавили
+      - SECRET_KEY=your_secret_key   # *** ОБЯЗАТЕЛЬНО СМЕНИТЕ НА СВОЙ СЕКРЕТНЫЙ КЛЮЧ ***
+      - LOG_TO_STDOUT=1
+      - CONNECTION_TYPE=file #Добавлено
+    depends_on:
+      - redis
+    command: ["flask", "run", "--host=0.0.0.0"]  #  Запуск Flask dev server
+
+  redis:
+    image: "redis:alpine"
+
+  celery_worker:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///instance/app.db
+      - DHCP_SERVER_IP=192.168.1.1  #  *** ЗАМЕНИТЕ НА IP ВАШЕГО DHCP-СЕРВЕРА ***
+      - DHCP_LEASES_FILE=/var/lib/dhcp/dhcpd.leases # *** ЗАМЕНИТЕ НА ПУТЬ К ВАШЕМУ dhcpd.leases ***
+      - DHCP_CONF_FILE=/etc/dhcp/dhcpd.conf       # <-- Добавили
+      - SECRET_KEY=your_secret_key   # *** ОБЯЗАТЕЛЬНО СМЕНИТЕ НА СВОЙ СЕКРЕТНЫЙ КЛЮЧ ***
+      - LOG_TO_STDOUT=1
+      - CONNECTION_TYPE=file #Добавить
+    depends_on:
+      - redis
+      - web
+    command: ["celery", "-A", "app.tasks.celery", "worker", "-l", "info"]
+
+  celery_beat:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///instance/app.db
+      - DHCP_SERVER_IP=192.168.1.1  #  *** ЗАМЕНИТЕ НА IP ВАШЕГО DHCP-СЕРВЕРА ***
+      - DHCP_LEASES_FILE=/var/lib/dhcp/dhcpd.leases # *** ЗАМЕНИТЕ НА ПУТЬ К ВАШЕМУ dhcpd.leases ***
+      - DHCP_CONF_FILE=/etc/dhcp/dhcpd.conf    # <-- Добавили
+      - SECRET_KEY=your_secret_key   # *** ОБЯЗАТЕЛЬНО СМЕНИТЕ НА СВОЙ СЕКРЕТНЫЙ КЛЮЧ ***
+      - LOG_TO_STDOUT=1
+      - CONNECTION_TYPE=file #Добавить
+    depends_on:
+      - redis
+      - web
+      - celery_worker
+    command: ["celery", "-A", "app.tasks.celery", "beat", "-l", "info", "--scheduler", "redbeat.RedBeatScheduler"]
+
+volumes:
+  postgres_data: # volumes для postgresql
