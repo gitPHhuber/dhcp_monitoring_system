@@ -1,114 +1,125 @@
-<table class="table table-striped" id="leases-table">
-    <thead>
-        <tr>
-            <th>IP Address</th>
-            <th>MAC Address</th>
-            <th>Hostname</th>
-            <th>Starts</th>
-            <th>Ends</th>
-            <th>State</th>
-            <th>Online</th>
-            <th>Last Check</th>
-            <th>In Work</th>
-            <th>Taken By</th>
-            <th>Status</th>
-            {% if current_user.role == 'admin' %}
-            <th>Actions</th>
-            {% endif %}
-        </tr>
-    </thead>
-    <tbody>
-        {% for lease in leases.items %}
-            <tr {% if lease.status.value == 'in_work' %}class="table-warning"{% endif %}>
-                <td><a href="http://{{ lease.ip }}" target="_blank">{{ lease.ip }}</a></td>
-                <td>{{ lease.mac }}</td>
-                <td>{{ lease.hostname|d('N/A') }}</td>
-                <td>{{ lease.starts|d('N/A') }}</td>
-                <td>{{ lease.ends|d('N/A') }}</td>
-                <td>{{ lease.binding_state }}</td>
-                <td>{{ "Online" if lease.is_online else "Offline" }}</td>
-                <td>{{ lease.last_check|d('N/A') }}</td>
-                <td>
-                    {% if lease.in_work %}
-                        <span class="badge bg-warning">In Work</span>
-                    {% else %}
-                        <span class="badge bg-secondary">Not In Work</span>
-                    {% endif %}
-                </td>
-                <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
-                <td>{{ lease.status.value }}</td>
-                <td>
-                     {#  Кнопки действий  #}
+<table class="table table-striped" id="leases-table" data-status="{{ request.path.split('/')[-1] }}" data-url="{{ url_for('main.update_table') }}" data-search-query="{{ search_query }}">
+  <thead>
+      <tr>
+          <th>IP Address</th>
+          <th>MAC Address</th>
+          <th>Hostname</th>
+          <th>Starts</th>
+          <th>Ends</th>
+          <th>State</th>
+          <th>Online</th>
+          <th>Last Check</th>
+          <th>In Work</th>
+          <th>Taken By</th>
+          <th>Status</th>
+          <th>Actions</th>  {# <--  Убрали if current_user.role == 'admin' #}
+      </tr>
+  </thead>
+  <tbody>
+      {% for lease in leases.items %}
+      <tr class="{% if lease.status.value == 'in_work' %}table-warning{% elif lease.status.value == 'completed' %}table-success{% elif lease.status.value == 'broken' %}table-danger{% elif lease.status.value == 'pending' %}table-info{% elif lease.status.value == 'active' %}table-primary{% endif %}">
+          <td>
+              {% if lease.get_web_interface_url() %}
+              <a href="{{ lease.get_web_interface_url() }}" target="_blank">{{ lease.ip }}</a>
+              {% else %}
+              {{ lease.ip }}
+              {% endif %}
+          </td>
+          <td>{{ lease.mac }}</td>
+          <td>{{ lease.hostname|d('N/A') }}</td>
+          <td>{{ lease.starts|d('N/A') }}</td>
+          <td>{{ lease.ends|d('N/A') }}</td>
+          <td>{{ lease.binding_state }}</td>
+          <td>{{ "Online" if lease.is_online else "Offline" }}</td>
+          <td>{{ lease.last_check|d('N/A') }}</td>
+          <td>
+              {% if lease.in_work %}
+              <span class="badge bg-warning">In Work</span>
+              {% else %}
+              <span class="badge bg-secondary">Not In Work</span>
+              {% endif %}
+          </td>
+          <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
+         <td>
+              {% if lease.status.value == 'completed' %}
+              <span class="badge bg-success">Completed</span>
+              {% elif lease.status.value == 'in_work' %}
+              <span class="badge bg-warning">In Work</span>
+              {% elif lease.status.value == 'broken' %}
+              <span class="badge bg-danger">Broken</span>
+              {% elif lease.status.value == 'pending' %}
+              <span class="badge bg-info">Pending</span>
+              {% elif lease.status.value == 'active' %}
+              <span class="badge bg-primary">Active</span>
+              {% else %}
+              {{ lease.status.value }}
+              {% endif %}
+          </td>
+          <td>
+              {# Кнопки действий #}
 
-                     {#  ТЕСТИРОВЩИК  #}
-                     {% if current_user.role == 'tester' %}
-                         {% if lease.status.value == 'active' %}
-                             <button class="btn btn-sm btn-primary take-btn" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</button>
-                         {% endif %}
-                         {% if lease.status.value == 'in_work' and lease.taken_by_id == current_user.id %}
-                             <button class="btn btn-sm btn-outline-secondary release-btn" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</button>
-                             <button class="btn btn-sm btn-outline-success complete-btn" data-url="{{ url_for('api.complete_lease', lease_id=lease.id) }}">Complete</button>
-                         {% endif %}
-                     {% endif %}
+              {# ТЕСТИРОВЩИК #}
+              {% if current_user.role == 'tester' %}
+                  {% if lease.status.value == 'active' %}
+                      <button class="btn btn-sm btn-primary take-btn" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</button>
+                  {% endif %}
+                  {% if lease.status.value == 'in_work' and (lease.taken_by_id == current_user.id or current_user.role == 'admin') %}
+                      <button class="btn btn-sm btn-outline-secondary release-btn" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</button>
+                  {% endif %}
+              {% endif %}
 
+              {# АДМИНИСТРАТОР #}
+              {% if current_user.role == 'admin' %}
+                  <div class="dropdown">
+                      <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                          Admin
+                      </button>
+                      <ul class="dropdown-menu">
+                          {% if lease.status.value == 'active' %}
+                              <li><a class="dropdown-item take-btn" href="#" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</a></li>
+                          {% endif %}
+                          {% if lease.status.value == 'in_work' %}
+                              <li><a class="dropdown-item release-btn" href="#" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</a></li>
+                          {% endif %}
+                          {% if lease.status.value != 'completed' %}
+                              <li><button class="btn btn-sm btn-outline-success complete-with-comment-btn dropdown-item" data-url="{{ url_for('api.complete_lease_with_comment', lease_id=lease.id) }}" data-bs-toggle="modal" data-bs-target="#completeCommentModal{{ lease.id }}">Complete with Comment</button></li>
+                              <!-- Модальное окно -->
+                              <div class="modal fade" id="completeCommentModal{{ lease.id }}" tabindex="-1" aria-labelledby="completeCommentModalLabel{{ lease.id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                  <div class="modal-content">
+                                    <div class="modal-header">
+                                      <h5 class="modal-title" id="completeCommentModalLabel{{ lease.id }}">Complete with Comment</h5>
+                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                      <textarea id="comment{{ lease.id }}" class="form-control" rows="3" placeholder="Enter comment..."></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                      <button type="button" class="btn btn-primary complete-comment-submit-btn" data-lease-id="{{ lease.id }}">Submit</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                          {% endif %}
+                          {% if lease.status.value != 'pending' %}
+                              <li><a class="dropdown-item pending-btn" href="#" data-url="{{ url_for('api.pending_lease', lease_id=lease.id) }}">Pending</a></li>
+                          {% endif %}
+                          {% if lease.status.value != 'broken' %}
+                              <li><a class="dropdown-item broken-btn" href="#" data-url="{{ url_for('api.broken_lease', lease_id=lease.id) }}">Broken</a></li>
+                          {% endif %}
 
-                     {#  АДМИНИСТРАТОР  #}
-                     {% if current_user.role == 'admin' %}
-                         <div class="dropdown">
-                             <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                 Admin
-                             </button>
-                             <ul class="dropdown-menu">
-                                 {% if lease.status.value == 'active' %}
-                                    <li><a class="dropdown-item take-btn" href="#" data-url="{{ url_for('api.take_lease', lease_id=lease.id) }}">Take</a></li>
-                                 {% endif %}
-                                 {% if lease.status.value == 'in_work' %}
-                                    <li><a class="dropdown-item release-btn" href="#" data-url="{{ url_for('api.release_lease', lease_id=lease.id) }}">Release</a></li>
-                                 {% endif %}
-                                 <li><a class="dropdown-item complete-btn" href="#" data-url="{{ url_for('api.complete_lease', lease_id=lease.id) }}">Complete</a></li>
-                                 {% if lease.status.value != 'pending' %}
-                                     <li><a class="dropdown-item pending-btn" href="#" data-url="{{ url_for('api.pending_lease', lease_id=lease.id) }}">Pending</a></li>
-                                 {% endif %}
-                                 {% if lease.status.value != 'broken' %}
-                                     <li><a class="dropdown-item broken-btn" href="#" data-url="{{ url_for('api.broken_lease', lease_id=lease.id) }}">Broken</a></li>
-                                 {% endif %}
-                                 <li><a class="dropdown-item reset-btn" href="#" data-url="{{ url_for('api.reset_lease', lease_id=lease.id) }}">Reset Status</a></li>
-                                 <li><hr class="dropdown-divider"></li>
-                                 <li><a class="dropdown-item delete-btn" href="#" data-url="{{ url_for('api.delete_lease', lease_id=lease.id)}}">Delete</a></li>
-                             </ul>
-                         </div>
-                     {% endif %}
-                 </td>
-            </tr>
-        {% endfor %}
-    </tbody>
+                          {% if lease.status.value == 'broken' %}
+                              <li><a class="dropdown-item return-btn" href="#" data-url="{{ url_for('api.return_lease', lease_id=lease.id) }}">Return</a></li>
+                          {% endif %}
+                          <li><a class="dropdown-item reset-btn" href="#" data-url="{{ url_for('api.reset_lease', lease_id=lease.id) }}">Reset Status</a></li>
+                          <li><hr class="dropdown-divider"></li>
+                          <li><a class="dropdown-item delete-btn" href="#" data-url="{{ url_for('api.delete_lease', lease_id=lease.id)}}">Delete</a></li>
+                      </ul>
+                  </div>
+              {% endif %}
+          </td>
+      </tr>
+      {% endfor %}
+  </tbody>
 </table>
-
-{# Пагинация #}
- <nav>
-    <ul class="pagination">
-        {% if leases.has_prev %}
-            <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.prev_num, q=search_query) }}">Previous</a></li>
-        {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-        {% endif %}
-
-        {% for page_num in leases.iter_pages() %}
-            {% if page_num %}
-                {% if page_num == leases.page %}
-                    <li class="page-item active"><a class="page-link" href="#">{{ page_num }}</a></li>
-                {% else %}
-                    <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=page_num, q=search_query) }}">{{ page_num }}</a></li>
-                {% endif %}
-            {% else %}
-                <li class="page-item disabled"><a class="page-link" href="#">...</a></li>
-            {% endif %}
-        {% endfor %}
-
-        {% if leases.has_next %}
-            <li class="page-item"><a class="page-link" href="{{ url_for('main.index', page=leases.next_num, q=search_query) }}">Next</a></li>
-        {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
-        {% endif %}
-    </ul>
-</nav>

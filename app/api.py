@@ -4,8 +4,8 @@ from .models import Lease, LeaseStatus, LeaseStatusHistory
 from .extensions import db
 from .utils import parse_dhcp_leases
 from . import tasks
-from .journal import record_action # Добавил
-from .models import Lease, LeaseStatus, LeaseStatusHistory
+from .journal import record_action  # Добавил
+# from .models import Lease, LeaseStatus, LeaseStatusHistory  # Уже импортировано выше
 
 api = Blueprint('api', __name__)
 
@@ -28,13 +28,13 @@ def take_lease(lease_id):
     if lease.in_work and lease.taken_by_id != current_user.id:
         return jsonify({'message': 'Lease is already taken by another user.'}), 409
 
-    old_status = lease.status  # Сохраняем старый статус
+    old_status = lease.status
     lease.in_work = True
     lease.taken_by_id = current_user.id
     lease.status = LeaseStatus.IN_WORK
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) #Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'take_lease', f'Lease ID: {lease_id}') # Добавил
+    record_action(current_user.id, 'take_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease taken successfully.', 'lease': lease.as_dict()}), 200
 
 @api.route('/leases/<int:lease_id>/release', methods=['POST'])
@@ -45,13 +45,13 @@ def release_lease(lease_id):
         return jsonify({'message': 'Lease is not taken.'}), 400
     if lease.taken_by_id != current_user.id and current_user.role != 'admin':
         return jsonify({'message': 'You do not have permission to release this lease.'}), 403
-    old_status = lease.status  # Добавили
+    old_status = lease.status
     lease.in_work = False
     lease.taken_by_id = None
     lease.status = LeaseStatus.ACTIVE
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'release_lease', f'Lease ID: {lease_id}') # Добавил
+    record_action(current_user.id, 'release_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease released successfully.', 'lease': lease.as_dict()}), 200
 
 
@@ -59,13 +59,28 @@ def release_lease(lease_id):
 @login_required
 def complete_lease(lease_id):
     lease = Lease.query.get_or_404(lease_id)
-    old_status = lease.status # Добавили
+    old_status = lease.status
     lease.status = LeaseStatus.COMPLETED
     lease.in_work = False
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'complete_lease', f'Lease ID: {lease_id}')  # Добавил
+    record_action(current_user.id, 'complete_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease completed successfully.', 'lease': lease.as_dict()}), 200
+
+@api.route('/leases/<int:lease_id>/complete_with_comment', methods=['POST'])
+@login_required
+def complete_lease_with_comment(lease_id):
+    lease = Lease.query.get_or_404(lease_id)
+    old_status = lease.status
+    lease.status = LeaseStatus.COMPLETED
+    lease.in_work = False
+    data = request.get_json()
+    comment = data.get('comment', '') if data else '' # Получаем комментарий из запроса
+    history_entry = LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status, comment=comment)
+    db.session.add(history_entry)
+    db.session.commit()
+    record_action(current_user.id, 'complete_lease_with_comment', f'Lease ID: {lease_id}, Comment: {comment}')
+    return jsonify({'message': 'Lease completed with comment successfully.', 'lease': lease.as_dict()}), 200
 
 
 @api.route('/leases/<int:lease_id>/pending', methods=['POST'])
@@ -74,11 +89,11 @@ def pending_lease(lease_id):
     if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
     lease = Lease.query.get_or_404(lease_id)
-    old_status = lease.status  # Добавили
+    old_status = lease.status
     lease.status = LeaseStatus.PENDING
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'pending_lease', f'Lease ID: {lease_id}') # Добавил
+    record_action(current_user.id, 'pending_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease set to pending successfully.', 'lease': lease.as_dict()}), 200
 
 
@@ -88,11 +103,11 @@ def broken_lease(lease_id):
     if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
     lease = Lease.query.get_or_404(lease_id)
-    old_status = lease.status  # Добавили
+    old_status = lease.status
     lease.status = LeaseStatus.BROKEN
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'broken_lease', f'Lease ID: {lease_id}') # Добавил
+    record_action(current_user.id, 'broken_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease set to broken successfully.', 'lease': lease.as_dict()}), 200
 
 @api.route('/leases/<int:lease_id>/reset', methods=['POST'])
@@ -101,14 +116,48 @@ def reset_lease(lease_id):
     if current_user.role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 403
     lease = Lease.query.get_or_404(lease_id)
-    old_status = lease.status  #  Добавили
+    old_status = lease.status
     lease.status = LeaseStatus.ACTIVE
     lease.in_work = False
     lease.taken_by_id = None
-    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status)) # Добавили
+    db.session.add(LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
     db.session.commit()
-    record_action(current_user.id, 'reset_lease', f'Lease ID: {lease_id}')# Добавил
+    record_action(current_user.id, 'reset_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease status reset successfully.', 'lease': lease.as_dict()}), 200
+
+@api.route('/leases/<int:lease_id>/return', methods=['POST'])
+@login_required
+def return_lease(lease_id):
+    if current_user.role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 403
+    lease = Lease.query.get_or_404(lease_id)
+    old_status = lease.status
+    lease.status = LeaseStatus.ACTIVE  #  Возвращаем в ACTIVE
+    lease.in_work = False  # Снимаем флаг "в работе"
+    lease.taken_by_id = None  #  Очищаем поле taken_by_id
+    db.session.add(
+        LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status))
+    db.session.commit()
+    record_action(current_user.id, 'return_lease', f'Lease ID: {lease_id}')
+    return jsonify({'message': 'Lease status return successfully.', 'lease': lease.as_dict()}), 200
+
+@api.route('/leases/<int:lease_id>/add_comment_to_broken', methods=['POST'])
+@login_required
+def add_comment_to_broken(lease_id):
+    lease = Lease.query.get_or_404(lease_id)
+    if current_user.role != 'admin': #Или кто может
+        return jsonify({'message': 'Unauthorized'}), 403
+    data = request.get_json()
+    comment = data.get('comment', '') if data else '' # Получаем комментарий из запроса
+    #Тут можно добавить логику, что если лиз не broken, то перевести его в broken
+    old_status = lease.status
+    if lease.status != LeaseStatus.BROKEN:
+        lease.status = LeaseStatus.BROKEN
+    history_entry = LeaseStatusHistory(lease=lease, user=current_user, old_status=old_status, new_status=lease.status, comment=comment)
+    db.session.add(history_entry)
+    db.session.commit()
+    record_action(current_user.id, 'add_comment_to_broken', f'Lease ID: {lease_id}, Comment: {comment}')
+    return jsonify({'message': 'Comment added to broken lease successfully.', 'lease': lease.as_dict()}), 200
 
 @api.route('/leases/<int:lease_id>', methods=['PUT'])
 @login_required
@@ -125,7 +174,7 @@ def update_lease(lease_id):
         if hasattr(lease, key):
             setattr(lease, key, value)
     db.session.commit()
-    record_action(current_user.id, 'update_lease', f'Lease ID: {lease_id}')  # Добавил
+    record_action(current_user.id, 'update_lease', f'Lease ID: {lease_id}')
     return jsonify({'message': 'Lease updated successfully', 'lease': lease.as_dict()}), 200
 
 

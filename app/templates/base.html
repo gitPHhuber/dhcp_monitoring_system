@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
+
   <style>
     /* Стили для темной темы */
     body.dark-mode {
@@ -23,7 +24,7 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
       <a class="navbar-brand" href="{{ url_for('main.index') }}">DHCP Monitor</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
               aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -47,7 +48,7 @@
           {% if current_user.is_authenticated %}
             {% if current_user.role == 'admin' %}
               <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a> 
+                <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
               </li>
             {% endif %}
             <li class="nav-item">
@@ -55,6 +56,12 @@
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('users.user_list') }}">Users</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('server_management.manage_servers') }}">Manage Servers</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('server_monitoring.monitor_servers') }}">Monitor Servers</a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('network.network_map') }}">Network Map</a>
@@ -94,26 +101,7 @@
 
     {% block content %}{% endblock %}
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    $(document).ready(function() {
-      // Переключение темной темы
-      $("#dark-mode-toggle").click(function() {
-        let currentTheme = $("body").hasClass("dark-mode") ? "dark" : "light";
-        $.ajax({
-          url: "{{ url_for('main.toggle_dark_mode') }}?theme=" + currentTheme,
-          type: "GET",
-          success: function(data) {
-            if (data.theme === 'dark') {
-              $("body").addClass("dark-mode");
-            } else {
-              $("body").removeClass("dark-mode");
-            }
-          }
-        });
-      });
-    });
-  </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

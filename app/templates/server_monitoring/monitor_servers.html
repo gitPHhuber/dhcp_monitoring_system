@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+    <a href="{{ url_for('server_monitoring.monitor_servers') }}">Go to Server Monitoring</a>
     <h1>Мониторинг серверного оборудования</h1>
     <p>В разработке (интеграция с Grafana будет добавлена позже).</p>
 {% endblock %}

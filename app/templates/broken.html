@@ -2,72 +2,17 @@
 
 {% block content %}
     <h1>Broken Servers</h1>
-     <form action="{{ url_for('main.broken') }}" method="GET">
+    <form action="{{ url_for('main.broken') }}" method="GET">
         <div class="input-group mb-3">
             <input type="text" class="form-control" placeholder="Search by IP or Hostname" name="q" value="{{ search_query }}">
             <button class="btn btn-primary" type="submit">Search</button>
         </div>
     </form>
-    <table class="table table-striped">
-        <thead>
-           <tr>
-                <th>IP Address</th>
-                <th>MAC Address</th>
-                <th>Hostname</th>
-                <th>Starts</th>
-                <th>Ends</th>
-                <th>State</th>
-                <th>Online</th>
-                <th>Last Check</th>
-                <th>In Work</th>
-                <th>Taken By</th>
-                <th>Status</th>
-                {% if current_user.role == 'admin' %}
-                <th>Actions</th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for lease in leases.items %}
-                <tr>
-                   <td>{{ lease.ip }}</td>
-                    <td>{{ lease.mac }}</td>
-                    <td>{{ lease.hostname|d('N/A') }}</td>
-                    <td>{{ lease.starts|d('N/A') }}</td>
-                    <td>{{ lease.ends|d('N/A') }}</td>
-                    <td>{{ lease.binding_state }}</td>
-                    <td>{{ "Online" if lease.is_online else "Offline" }}</td>
-                    <td>{{ lease.last_check|d('N/A') }}</td>
-                    <td>
-                        {% if lease.in_work %}
-                            <span class="badge bg-warning">In Work</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Not In Work</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ lease.taken_user.username if lease.taken_user else '' }}</td>
-                    <td>{{ lease.status.value }}</td>  {# ИСПРАВЛЕНО: .value #}
-                    <td>
-                    {% if current_user.role == 'admin' %}
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                Admin
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item reset-btn" href="#" data-url="{{ url_for('api.reset_lease', lease_id=lease.id) }}">Reset Status</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item delete-btn" href="#" data-url="{{ url_for('api.delete_lease', lease_id=lease.id)}}">Delete</a></li>
-                            </ul>
-                        </div>
-                    {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+
+    {% include 'leases_table.html' %}
+
     <nav>
-        {#  Пагинация (такая же, как в index.html)  #}
-       <ul class="pagination">
+        <ul class="pagination">
             {% if leases.has_prev %}
                 <li class="page-item"><a class="page-link" href="{{ url_for('main.broken', page=leases.prev_num, q=search_query) }}">Previous</a></li>
             {% else %}
@@ -93,6 +38,4 @@
             {% endif %}
         </ul>
     </nav>
-    <script>
-    </script>
 {% endblock %}

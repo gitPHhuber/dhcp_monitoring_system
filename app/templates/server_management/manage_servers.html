@@ -1,37 +1,40 @@
+{# app/templates/server_management/manage_servers.html #}
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>Работа с серверным оборудованием</h1>
-
+    <h1>Manage Servers</h1>
+    <a href="{{ url_for('server_management.manage_servers') }}">Go to Server Management</a>
     <div class="mb-3">
-        <button class="btn btn-primary run-playbook-btn" data-playbook="playbook1">Запустить Playbook 1</button>
-        <button class="btn btn-primary run-playbook-btn" data-playbook="playbook2">Запустить Playbook 2</button>
-         <!-- Добавьте другие кнопки по мере необходимости -->
+        <a href="{{ url_for('server_management.add_playbook') }}" class="btn btn-primary">Add Playbook</a>
     </div>
 
-    <div id="result-message"></div> {#  Для отображения сообщений об успехе/ошибке #}
+    <div id="result-message"></div>
+
+    <div class="mb-3">
+        {% for playbook in playbooks %}
+            <button class="btn btn-primary run-playbook-btn" data-playbook-id="{{ playbook.id }}">{{ playbook.name }}</button>
+        {% endfor %}
+    </div>
 
     <script>
     $(document).ready(function() {
         $(".run-playbook-btn").click(function() {
-            let playbookName = $(this).data("playbook");
-             $("#result-message").text(`Running playbook: ${playbookName}...`).removeClass().addClass('alert alert-info'); //Показываем, что выполняется
+            let playbookId = $(this).data("playbook-id");  //  Используем playbook-id
+             $("#result-message").text(`Running playbook: ${playbookId}...`).removeClass().addClass('alert alert-info');
             $.ajax({
                 url: "{{ url_for('server_management.run_playbook') }}",
                 type: "POST",
-                data: { playbook: playbookName },
+                data: { playbook_id: playbookId },  //  Передаём playbook_id
                 success: function(response) {
-                    $("#result-message").text(response.message).removeClass().addClass('alert alert-success');
+                    $("#result-message").html(response.message + (response.output ? "<pre>" + response.output + "</pre>" : "")).removeClass().addClass('alert alert-success');
                 },
                 error: function(xhr, status, error) {
-                    let errorMessage = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : "Error running playbook.";
+                    let errorMessage = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : "Error running playbook.");
                     $("#result-message").text(errorMessage).removeClass().addClass('alert alert-danger');
-
                 }
             });
         });
     });
-
     </script>
 
 {% endblock %}

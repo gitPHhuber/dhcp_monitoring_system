@@ -41,12 +41,6 @@ def create_app(config_name='default'):
     from .auth import auth as auth_blueprint  # Blueprint для аутентификации
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
 
-    from .server_management import server_management as server_management_blueprint #Добавлено
-    app.register_blueprint(server_management_blueprint) #Добавлено
-
-    from .server_monitoring import server_monitoring as server_monitoring_blueprint #Добавлено
-    app.register_blueprint(server_monitoring_blueprint) #Добавлено
-
     from .users import users as users_blueprint  # Добавили
     app.register_blueprint(users_blueprint)      # Добавили
 
@@ -55,6 +49,12 @@ def create_app(config_name='default'):
 
     from .network import network as network_blueprint
     app.register_blueprint(network_blueprint, url_prefix='/network')
+
+    from .server_management import server_management as server_management_blueprint  # <-- ПОСЛЕ!
+    app.register_blueprint(server_management_blueprint)
+
+    from .server_monitoring import server_monitoring as server_monitoring_blueprint
+    app.register_blueprint(server_monitoring_blueprint)
 
     #Настройка журналирования
     if not app.debug and not app.testing:

@@ -65,8 +65,14 @@ class Lease(db.Model):
         backref='lease_obj',
         lazy='dynamic',
         order_by='desc(LeaseStatusHistory.timestamp)',
-        overlaps="status_history,lease_obj"  #  <--  ДОБАВИТЬ overlaps
+        overlaps="status_history,lease_obj"  # <-- ДОБАВИТЬ overlaps
     )
+
+    def get_web_interface_url(self):
+        """Возвращает URL веб-интерфейса для данного лиза."""
+        # Здесь нужно реализовать логику формирования URL.
+        # Например:
+        return f"http://{self.ip}:8080/admin"
     
     def __repr__(self):
         return f'<Lease {self.ip}>'
@@ -237,3 +243,15 @@ def initialize_server_config(app):
             default_config = ServerConfig(dhcp_server_ip=app.config['DHCP_SERVER_IP'], connection_type = app.config.get('CONNECTION_TYPE', 'file'))
             db.session.add(default_config)
             db.session.commit()
+
+
+
+class Playbook(db.Model):
+    __tablename__ = 'playbooks'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(255))  # Необязательное описание
+    content = db.Column(db.Text, nullable=False) # Содержимое плейбука (YAML)
+
+    def __repr__(self):
+        return f'<Playbook {self.name}>'
