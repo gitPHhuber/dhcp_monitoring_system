@@ -20,7 +20,7 @@
     <tbody>
         {% for lease in leases.items %}
             <tr {% if lease.status.value == 'in_work' %}class="table-warning"{% endif %}>
-                <td>{{ lease.ip }}</td>
+                <td><a href="http://{{ lease.ip }}" target="_blank">{{ lease.ip }}</a></td>
                 <td>{{ lease.mac }}</td>
                 <td>{{ lease.hostname|d('N/A') }}</td>
                 <td>{{ lease.starts|d('N/A') }}</td>
